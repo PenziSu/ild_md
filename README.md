@@ -23,6 +23,6 @@ Open config.py and tweak these settings:
 ```Python
 
 OLLAMA_MODEL_NAME = "Elixpo/LlamaMedicine:latest"
-OLLAMA_API_BASE = "http://172.22.135.17:11434/v1"
+OLLAMA_API_BASE = "http://192.168.1.100:11434/v1"
 EXTRACTOR_OLLAMA_MODEL_NAME = "Elixpo/LlamaMedicine:latest" # For the Langchain-based
 ```

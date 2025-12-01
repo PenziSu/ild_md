@@ -9,7 +9,7 @@ pro6000 = '172.22.135.15:11434'
 OLLAMA_MODEL_NAME = "qwen3:8b"
 OLLAMA_API_BASE = "http://" + pro6000 + "/v1"
 OLLAMA_API_KEY = "ollama"
-OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:v1.5"
+OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:137m-v1.5-fp16"
 EXTRACTOR_OLLAMA_MODEL_NAME = "qwen3:8b" # For the Langchain-based extractor
 
 # --- File and Directory Paths ---

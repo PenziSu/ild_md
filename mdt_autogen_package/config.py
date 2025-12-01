@@ -6,7 +6,7 @@ phison_ip = '192.168.1.100:11434'
 nstc_ip = '192.168.1.101:11434'
 pro6000 = '172.22.135.15:11434'
 
-OLLAMA_MODEL_NAME = "qwen3:8b"
+OLLAMA_MODEL_NAME = "gpt-oss:20b"
 OLLAMA_API_BASE = "http://" + pro6000 + "/v1"
 OLLAMA_API_KEY = "ollama"
 OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:137m-v1.5-fp16"
@@ -23,7 +23,7 @@ GUIDELINES_FILE = os.path.join(KNOWLEDGE_BASE_DIR, "guidelines.txt")
 SIMILAR_CASES_FILE = os.path.join(KNOWLEDGE_BASE_DIR, "similar_cases.txt")
 
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "mdt_outputs")
-OUTPUT_CSV_PREFIX = "mdt_autogen_extracted_qwen3_8b" # Changed prefix to distinguish
+OUTPUT_CSV_PREFIX = f"mdt_autogen_extracted_{OLLAMA_MODEL_NAME.replace(":","_")}" # Changed prefix to distinguish
 
 # --- RAG Configuration ---
 RAG_TOP_K = 3

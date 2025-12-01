@@ -1,0 +1,54 @@
+# Gemini CLI Edit Log
+
+## File Purpose
+This document summarizes the refactoring journey of the AutoGen-based MDT simulation project. Its purpose is to provide context for the next Gemini CLI agent or human developer who will work on this codebase.
+
+## Initial State
+The project started with a main runner (`main_runner.py`) and a core simulation module (`mdt_autogen_package/mdt_simulation_tool_CRIT.py`). All agent `system_message` prompts were hardcoded as multiline strings directly within the Python script. The discussion flow was managed by AutoGen's default `'auto'` speaker selection, which was rigid and sometimes led to unpredictable behavior or infinite loops.
+
+## Summary of Final Architecture (As of this Log's Creation)
+The project has been significantly refactored into a robust, configuration-driven, three-phase orchestration system.
+
+1.  **Configuration-Driven Agents**:
+    *   All agents, including a special `PlannerAgent`, are defined by individual `.json` files in the `role_player_prompt/` directory.
+    *   Each JSON file encapsulates all properties for a single agent, including its `agent_name` (which now also serves as its `role`), whether it's the `is_chair`, and its `prompt`.
+    *   The Python code **dynamically discovers and loads** these JSON files at runtime. Adding or removing an agent from the simulation is as simple as adding or removing its corresponding JSON file.
+
+2.  **Three-Phase Simulation Flow**:
+    The core logic in `mdt_simulation_tool_CRIT.py` now executes in three distinct phases for each patient:
+    *   **Phase 1: Plan**: A temporary `PlannerAgent` is instantiated. It analyzes the patient summary and determines the optimal speaking order for all participant agents based on a "least severe issue first, most severe issue last" logic. It outputs this plan along with its reasoning, which is printed to the console for transparency.
+    *   **Phase 2: Discuss**: A `GroupChat` is initiated with the agents arranged in the order determined by the Planner. The `speaker_selection_method` is set to `'round_robin'`, and the chat is configured to run for exactly one full round (everyone speaks once). This efficiently gathers all specialist opinions.
+    *   **Phase 3: Summarize**: After the discussion round concludes, a final, separate call is made to the Chair agent. It is given the complete discussion history and is explicitly tasked with providing a final synthesis that answers the 7 key clinical questions.
+
+---
+
+## Chronological Refactoring Log
+
+### Step 1: Externalization of Prompts
+*   **Problem**: Agent prompts were hardcoded in Python, making them difficult to manage and edit.
+*   **Solution**: Created the `role_player_prompt/` directory and extracted each agent's prompt into an external file. This decoupled the agent's "personality" from the core application logic.
+
+### Step 2: Transition to a Fully Configuration-Driven Model
+*   **Problem**: Agent properties like `agent_name` were still hardcoded in the Python script, creating a risk of inconsistency with the external prompt files.
+*   **User's Insight**: The user proposed that all information for a single agent should be in one file.
+*   **Solution**:
+    1.  Replaced the `.txt` prompt files with `.json` files.
+    2.  Each JSON file now contains all of that agent's properties (`agent_name`, `is_chair`, `prompt`, etc.).
+    3.  Per the user's direction, the `agent_name` was simplified to be the role itself (e.g., `"agent_name": "Radiologist"`), making the mapping logic simpler.
+    4.  The Python script was refactored to dynamically scan and load all `.json` files from the directory.
+
+### Step 3: Implementation of Intelligent, Dynamic Orchestration
+*   **Problem**: The discussion flow was either a fixed round-robin or an unpredictable `'auto'` selection. The user wanted a more intelligent flow based on the patient's condition.
+*   **User's Insight**: The user proposed a "least severe first, most severe last" logic to allow the final expert to synthesize all prior opinions.
+*   **Solution**: The two-phase "Plan -> Execute" concept was born, which then evolved into the final three-phase model.
+    1.  A special `Planner.json` file was created to define a new `PlannerAgent`.
+    2.  The `run_autogen_mdt_simulation` function was completely rewritten to implement the **Plan -> Discuss -> Summarize** logic.
+    3.  This provided a predictable, intelligent, and mission-oriented flow for the entire simulation.
+
+### Step 4: Prompt Refinements & Bug Fixing
+*   **Bug Fixes**: Corrected a `SyntaxError` (unterminated f-string) and a subsequent `IndentationError` that were introduced during the major refactoring of `mdt_simulation_tool_CRIT.py`.
+*   **Proactive Agents**: Removed passive instructions ("wait for the Chair to call on you") from the specialist prompts to ensure they would speak proactively when their turn came in the `round_robin` discussion.
+*   **Dual-Role Chair**: Refined the Chair/Rheumatologist's prompt to give it clear, distinct instructions for its two roles: act as a specialist providing a CRIT analysis during the discussion phase, and act as a summarizer answering the 7 questions in the final summarization phase.
+
+## Note to the Next Agent
+The current architecture is highly modular and robust. The core simulation logic is in `mdt_simulation_tool_CRIT.py`, and the agent team is fully managed by the JSON files in `role_player_prompt/`. Any future modifications should respect this configuration-driven, three-phase design.

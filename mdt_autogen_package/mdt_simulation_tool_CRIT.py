@@ -63,7 +63,7 @@ def setup_knowledge_base_rag(kb_dir: str, guidelines_file_path: str, similar_cas
         texts = text_splitter.split_documents(documents)
         
         # Create embeddings
-        embeddings = OllamaEmbeddings(model=config.OLLAMA_EMBEDDING_MODEL_NAME, base_url=config.phison_ip)  # Adjust model as needed
+        embeddings = OllamaEmbeddings(model=config.OLLAMA_EMBEDDING_MODEL_NAME, base_url=config.pro6000)  # Adjust model as needed
         
         # Create vector store
         KNOWLEDGE_VECTORSTORE_GLOBAL = FAISS.from_documents(texts, embeddings)

@@ -4,11 +4,12 @@ import os
 # --- LLM Configuration ---
 phison_ip = '192.168.1.100:11434'
 nstc_ip = '192.168.1.101:11434'
+pro6000 = '172.22.135.15:11434'
 
 OLLAMA_MODEL_NAME = "qwen3:8b"
-OLLAMA_API_BASE = "http://" + phison_ip + "/v1"
+OLLAMA_API_BASE = "http://" + pro6000 + "/v1"
 OLLAMA_API_KEY = "ollama"
-OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:137m-v1.5-fp16"
+OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:v1.5"
 EXTRACTOR_OLLAMA_MODEL_NAME = "qwen3:8b" # For the Langchain-based extractor
 
 # --- File and Directory Paths ---

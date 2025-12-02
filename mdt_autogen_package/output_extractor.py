@@ -21,22 +21,22 @@ def create_extractor_runnable(): # Renamed from create_extractor_llm_chain
     json_example_for_llm_guidance = """
 {
     "patient_id": "The patient's ID as mentioned in the transcript (patient's ID are like: 1398629D or 2402833J).",
-    "rheumatologist_initial_presentation_summary": "A brief summary of the rheumatologist's (Dr. Chen's) initial case presentation.",
-    "radiologist_initial_interpretation": "Summary of radiologist's (Dr. Wang's) initial interpretation of patient data.",
-    "pulmonologist_initial_interpretation": "Summary of pulmonologist's (Dr. Lin's) initial interpretation of patient data.",
-    "cardiologist_initial_interpretation": "Summary of cardiologist's (Dr. Lee's) initial interpretation of patient data.",
-    "is_ild_chair_synthesis": "The Chair's (Dr. Chen's) synthesized answer for 'Is this ILD?', after team discussion.",
-    "is_uip_chair_synthesis": "The Chair's (Dr. Chen's) synthesized answer for 'Is this UIP?', after team discussion.",
-    "has_nsip_pattern_chair_synthesis": "The Chair's (Dr. Chen's) synthesized answer for 'Is NSIP pattern present?', after team discussion.",
-    "ctd_ild_assessment_chair_synthesis": "The Chair's (Dr. Chen's) synthesized assessment of CTD-ILD (type and activity), after team discussion.",
-    "is_ppf_chair_synthesis": "The Chair's (Dr. Chen's) synthesized answer for 'Is this PPF?', after team discussion.",
-    "adjust_immunosuppression_chair_synthesis": "The Chair's (Dr. Chen's) synthesized recommendation on adjusting immunosuppression, after team discussion.",
-    "recommend_antifibrotic_chair_synthesis": "The Chair's (Dr. Chen's) synthesized recommendation on anti-fibrotic use, after team discussion.",
-    "final_diagnosis_rheumatology": "The final rheumatological diagnosis summary from Dr. Chen (Chair).",
-    "final_diagnosis_pulmonology": "The final pulmonology diagnosis summary from Dr. Lin.",
-    "final_diagnosis_radiology": "The final radiology diagnosis summary from Dr. Wang.",
-    "final_diagnosis_cardiology": "The final cardiology diagnosis summary from Dr. Lee.",
-    "final_diagnosis_overall_summary_chair": "Dr. Chen's (Chair's) final overall case summary and management plan."
+    "rheumatologist_initial_presentation_summary": "A brief summary of the Rheumatologist_Specialist agent's initial case presentation.",
+    "radiologist_initial_interpretation": "Summary of the Radiologist agent's initial interpretation of patient data.",
+    "pulmonologist_initial_interpretation": "Summary of the Pulmonologist agent's initial interpretation of patient data.",
+    "cardiologist_initial_interpretation": "Summary of the Cardiologist agent's initial interpretation of patient data.",
+    "is_ild_chair_synthesis": "The Rheumatologist_Chair agent's synthesized answer for 'Is this ILD?', after team discussion.",
+    "is_uip_chair_synthesis": "The Rheumatologist_Chair agent's synthesized answer for 'Is this UIP?', after team discussion.",
+    "has_nsip_pattern_chair_synthesis": "The Rheumatologist_Chair agent's synthesized answer for 'Is NSIP pattern present?', after team discussion.",
+    "ctd_ild_assessment_chair_synthesis": "The Rheumatologist_Chair agent's synthesized assessment of CTD-ILD (type and activity), after team discussion.",
+    "is_ppf_chair_synthesis": "The Rheumatologist_Chair agent's synthesized answer for 'Is this PPF?', after team discussion.",
+    "adjust_immunosuppression_chair_synthesis": "The Rheumatologist_Chair agent's synthesized recommendation on adjusting immunosuppression, after team discussion.",
+    "recommend_antifibrotic_chair_synthesis": "The Rheumatologist_Chair agent's synthesized recommendation on anti-fibrotic use, after team discussion.",
+    "final_diagnosis_rheumatology": "The final rheumatological diagnosis summary from the Rheumatologist_Chair agent.",
+    "final_diagnosis_pulmonology": "The final pulmonology diagnosis summary from the Pulmonologist agent.",
+    "final_diagnosis_radiology": "The final radiology diagnosis summary from the Radiologist agent.",
+    "final_diagnosis_cardiology": "The final cardiology diagnosis summary from the Cardiologist agent.",
+    "final_diagnosis_overall_summary_chair": "The Rheumatologist_Chair agent's final overall case summary and management plan."
 }
 """
     # Escape curly braces for PromptTemplate if they are part of the JSON structure description
@@ -47,7 +47,7 @@ You are an expert medical information extractor.
 Given the following Multi-Disciplinary Team (MDT) discussion transcript for an ILD patient,
 please extract the requested information accurately and strictly adhere to the JSON format provided below.
 The patient's ID should be extracted from the transcript if mentioned (e.g., in the Chair's presentation or initial prompt).
-Focus on the CHAIR'S (Dr. Chen's) SYNTHESIZED answers for the specific clinical questions (Q1-Q7) after team input.
+Focus on the CHAIR'S (the 'Rheumatologist_Chair' agent's) SYNTHESIZED answers for the specific clinical questions (Q1-Q7) after team input.
 Also extract initial interpretations from each specialist and their final diagnoses.
 
 Discussion Transcript:

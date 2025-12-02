@@ -78,6 +78,7 @@ def query_knowledge_base_autogen_tool(query: str) -> str:
 def load_and_validate_agent_configs():
     """
     Scans for agent JSON configs, loads, validates them, and separates them into roles.
+    Returns three distinct items: the planner config, a list of specialist configs, and the chair config.
     """
     prompt_dir = os.path.join(os.path.dirname(__file__), '..', 'role_player_prompt')
     all_configs = []
@@ -100,26 +101,30 @@ def load_and_validate_agent_configs():
             print(f"Warning: An unexpected error occurred while loading '{os.path.basename(config_file)}': {e}")
     
     planner_configs = [cfg for cfg in all_configs if cfg.get('is_planner')]
-    participant_configs = [cfg for cfg in all_configs if not cfg.get('is_planner')]
-    chair_configs = [cfg for cfg in participant_configs if cfg.get('is_chair')]
+    chair_configs = [cfg for cfg in all_configs if cfg.get('is_chair')]
+    # Specialists are participants who are NOT the planner and NOT the chair
+    specialist_configs = [cfg for cfg in all_configs if not cfg.get('is_planner') and not cfg.get('is_chair')]
 
     if len(planner_configs) != 1:
         raise ValueError(f"Configuration Error: Expected 1 Planner agent ('is_planner': true), but found {len(planner_configs)}.")
     if len(chair_configs) != 1:
         raise ValueError(f"Configuration Error: Expected 1 Chair agent ('is_chair': true), but found {len(chair_configs)}.")
+    if not specialist_configs:
+        raise ValueError("Configuration Error: No specialist agents found (agents that are not planners or chairs).")
 
-    return planner_configs[0], participant_configs
+    return planner_configs[0], specialist_configs, chair_configs[0]
 
-def plan_discussion_order(planner_prompt: str, patient_data_summary: str, participant_roles: list) -> (list, str):
+
+def plan_discussion_order(planner_prompt: str, patient_data_summary: str, specialist_roles: list) -> (list, str):
     """
     Uses a PlannerAgent to decide the speaking order of all participants.
     """
     print("\n--- Phase 1: Planning Discussion Order ---")
-    default_order = sorted(participant_roles)
+    default_order = sorted(specialist_roles)
     
     full_planner_prompt = f"""{planner_prompt}
 
-The available specialist roles for ordering are: {participant_roles}. Your `order` array must contain exactly these strings, rearranged.
+The available specialist roles for ordering are: {specialist_roles}. Your `order` array must contain exactly these strings, rearranged.
 Patient Summary:
 {patient_data_summary}
 """
@@ -131,7 +136,7 @@ Patient Summary:
         parsed_reply = json.loads(reply_json_str)
 
         if all(k in parsed_reply for k in ['order', 'reasoning']) and isinstance(parsed_reply['order'], list):
-            if sorted(parsed_reply['order']) == sorted(participant_roles):
+            if sorted(parsed_reply['order']) == sorted(specialist_roles):
                 print(f"發言順序規劃原因：{parsed_reply['reasoning']}")
                 return parsed_reply['order'], parsed_reply['reasoning']
         
@@ -150,15 +155,15 @@ def run_autogen_mdt_simulation(patient_json_data: dict, patient_data_summary: st
     print(f"\n--- Starting AutoGen MDT Meeting Simulation for Patient: {patient_name} (ID: {patient_id}) ---")
 
     try:
-        planner_config, participant_configs = load_and_validate_agent_configs()
-        participant_roles = [cfg['agent_name'] for cfg in participant_configs]
-        chair_config = next((cfg for cfg in participant_configs if cfg.get('is_chair')), None)
+        planner_config, specialist_configs, chair_config = load_and_validate_agent_configs()
+        specialist_roles = [cfg['agent_name'] for cfg in specialist_configs]
+        
     except (FileNotFoundError, ValueError) as e:
         print(f"Halting simulation due to configuration error: {e}")
         return f"Error: {e}"
 
     # Phase 1: Plan
-    speaking_order, _ = plan_discussion_order(planner_config['prompt'], patient_data_summary, participant_roles)
+    speaking_order, _ = plan_discussion_order(planner_config['prompt'], patient_data_summary, specialist_roles)
     print(f"Planned speaking order: {speaking_order}")
 
     llm_config_no_tools = {**config.llm_config_autogen}
@@ -167,27 +172,85 @@ def run_autogen_mdt_simulation(patient_json_data: dict, patient_data_summary: st
         "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "The medical query"}},"required": ["query"]}}}]}
 
     agent_objects = {}
-    for cfg in participant_configs:
-        is_chair = cfg.get('is_chair', False)
+    
+    # Create specialist agents
+    for cfg in specialist_configs:
         agent = AssistantAgent(
             name=cfg['agent_name'],
             system_message=cfg['prompt'],
-            llm_config=llm_config_with_tools if is_chair else llm_config_no_tools,
-            max_consecutive_auto_reply=cfg.get('max_consecutive_auto_reply', 5 if is_chair else 3),
-            function_map={"query_knowledge_base_autogen_tool": query_knowledge_base_autogen_tool} if is_chair else None
+            llm_config=llm_config_with_tools, # All specialists can use tools now
+            max_consecutive_auto_reply=cfg.get('max_consecutive_auto_reply', 3), # Specialists have max 3 replies
+            function_map={"query_knowledge_base_autogen_tool": query_knowledge_base_autogen_tool}
         )
         agent_objects[cfg['agent_name']] = agent
+        
+    # Create the chair agent separately
+    chair_agent = AssistantAgent(
+        name=chair_config['agent_name'],
+        system_message=chair_config['prompt'],
+        llm_config=llm_config_with_tools, # Chair can also use tools for summarization if needed
+        max_consecutive_auto_reply=chair_config.get('max_consecutive_auto_reply', 5), # Chair has max 5 replies
+        function_map={"query_knowledge_base_autogen_tool": query_knowledge_base_autogen_tool}
+    )
+    # The chair is not added to agent_objects for discussion round
+
+    # Create ordered list of specialists for discussion
+    ordered_specialist_agents = [agent_objects[role] for role in speaking_order if role in agent_objects]
     
-    ordered_agents = [agent_objects[role] for role in speaking_order if role in agent_objects]
-    
+    # --- Custom Speaker Selection Logic ---
+    def custom_speaker_selection_logic(last_speaker: autogen.Agent, groupchat: autogen.GroupChat):
+        """
+        Custom speaker selection logic to handle tool calls correctly in a round-robin fashion.
+        Ensures the agent that made a tool call gets the next turn to process the tool's output.
+        """
+        messages = groupchat.messages
+        
+        # Rule 1: If the last message is a tool response, find the original caller.
+        if len(messages) > 1 and messages[-1].get("role") == "tool":
+            # The tool response message in this AutoGen version is quirky. 
+            # The tool_call_id is nested inside the 'tool_responses' list.
+            if "tool_responses" in messages[-1] and messages[-1]["tool_responses"]:
+                tool_call_id = messages[-1]["tool_responses"][0].get("tool_call_id")
+                if tool_call_id:
+                    # Search backwards for the assistant message that made the tool call
+                    for i in range(len(messages) - 2, -1, -1):
+                        msg = messages[i]
+                        if msg.get("role") == "assistant" and "tool_calls" in msg and msg["tool_calls"]:
+                            for tool_call in msg["tool_calls"]:
+                                if tool_call.get("id") == tool_call_id:
+                                    caller_name = msg.get("name")
+                                    if caller_name in agent_objects:
+                                        return agent_objects[caller_name]
+        
+        # Rule 2: Handle the initial turn after the Initiator.
+        if last_speaker.name == "Initiator":
+            return agent_objects[speaking_order[0]]
+
+        # Rule 3: Normal round-robin progression.
+        try:
+            current_idx = speaking_order.index(last_speaker.name)
+            next_idx = (current_idx + 1)
+            # If we've reached the end of the round, terminate the discussion.
+            if next_idx >= len(speaking_order):
+                return None 
+            return agent_objects[speaking_order[next_idx]]
+        except (ValueError, IndexError):
+            # Fallback: if the last speaker isn't in our planned specialist list, start from the beginning.
+            return agent_objects[speaking_order[0]]
+
     # --- Phase 2: Discussion ---
     print(f"\n--- Phase 2: Executing MDT Discussion (One Round) ---")
-    print(f"Agents will speak in the following order: {[agent.name for agent in ordered_agents]}")
+    print(f"Specialist agents will speak in the following order: {[agent.name for agent in ordered_specialist_agents]}")
 
-    discussion_groupchat = GroupChat(agents=ordered_agents, messages=[], max_round=len(ordered_agents) + 2, speaker_selection_method='round_robin', allow_repeat_speaker=False)
+    discussion_groupchat = GroupChat(
+        agents=ordered_specialist_agents, 
+        messages=[], 
+        max_round=15, # A safe upper limit for rounds
+        speaker_selection_method=custom_speaker_selection_logic,
+        allow_repeat_speaker=True # Crucial for allowing agent to speak after tool use
+    )
     manager = GroupChatManager(groupchat=discussion_groupchat, llm_config={**config.llm_config_autogen, "temperature": 0.1})
     
-    chair_agent = agent_objects[chair_config['agent_name']]
     initial_prompt = f"Welcome to the ILD MDT meeting for patient {patient_name} (ID: {patient_id}). Please provide your initial assessment when it is your turn.\n\nPatient Summary:\n{patient_data_summary}\n\nLet's begin."
     
     try:
@@ -207,19 +270,10 @@ def run_autogen_mdt_simulation(patient_json_data: dict, patient_data_summary: st
     print("\n--- Phase 3: Generating Final Summary ---")
     final_summary = ""
     try:
-        summary_prompt = """Based on the entire discussion history provided above, please act as the Chair (Rheumatologist) and provide a final synthesis.
-Your summary MUST address the following seven questions:
-1. Is this a case of ILD? (Yes/No/Uncertain)
-2. Is Usual Interstitial Pneumonia (UIP) the predominant pattern? (Yes/No/Uncertain)
-3. Is there a Non-specific Interstitial Pneumonia (NSIP) pattern? (Yes/No/Uncertain)
-4. What is the final Connective Tissue Disease (CTD)-ILD assessment (type and activity)?
-5. Is this a case of Progressive Fibrosing ILD (PF-ILD)? (Yes/No/Uncertain)
-6. Should we adjust the patient's immunosuppression? (Provide a brief recommendation)
-7. Should we recommend an anti-fibrotic agent? (Yes/No/Uncertain)
+        summary_prompt = chair_agent.system_message # Chair's system message already contains the summary prompt
 
-Conclude your entire response with the phrase 'MDT meeting concluded. TERMINATE_MDT_DISCUSSION_NOW' on a new line.
-"""
         # Make a final, single call to the chair agent for summarization
+        # Pass the discussion history and the summary prompt from the chair's system message
         final_summary = chair_agent.generate_reply(messages=discussion_history + [{"role": "user", "content": summary_prompt}])
         print("Final summary generated successfully.")
     except Exception as e:

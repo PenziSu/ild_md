@@ -3,6 +3,8 @@
 *.pyc
 *.csv
 *.xls
+*.xlsx
 /patient_data_files-backup/
 /patient_data_files/
 /patient_data_32_files/
+/evaluation_results/

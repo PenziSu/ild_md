@@ -52,3 +52,49 @@ The project has been significantly refactored into a robust, configuration-drive
 
 ## Note to the Next Agent
 The current architecture is highly modular and robust. The core simulation logic is in `mdt_simulation_tool_CRIT.py`, and the agent team is fully managed by the JSON files in `role_player_prompt/`. Any future modifications should respect this configuration-driven, three-phase design.
+
+### Step 5: Enhancing Robustness and Clarifying Agent Roles for Discussion Flow (2025年12月2日 星期二)
+*   **Problem 1 (Agent Confusion)**: The single `Rheumatologist` agent, tasked with both specialist discussion and chair summarization roles, led to internal confusion and repetitive output in the discussion phase.
+*   **Problem 2 (Broken Tool Call Workflow)**: The `GroupChat`'s `round_robin` speaker selection method failed to correctly manage turns when an agent (e.g., `Rheumatologist_Specialist`) initiated a tool call. This resulted in the agent not getting a follow-up turn to process tool output, leading to skipped agents and chaotic conversational loops.
+*   **Problem 3 (Brittle Output Extraction)**: The `output_extractor.py` module used hardcoded doctor names (e.g., "Dr. Chen") in its prompt guidance, creating a fragile dependency on specific personas not consistently present in the generated transcript.
+
+*   **Solution 1 (Role Separation)**:
+    1.  Split the original `Rheumatologist` into two distinct agents to align with SOLID principles:
+        *   `Rheumatologist_Specialist`: Focused solely on providing rheumatological CRIT analysis during the discussion. (Defined in `role_player_prompt/Rheumatologist_Specialist.json`)
+        *   `Rheumatologist_Chair`: Designated as the meeting chair and final summarizer, with a rheumatologist persona. (Defined in `role_player_prompt/Rheumatologist_Chair.json`)
+    2.  Refactored agent loading and selection logic in `mdt_simulation_tool_CRIT.py` to correctly identify and manage these new roles, ensuring only specialist agents participate in the discussion round and the dedicated chair handles summarization.
+
+*   **Solution 2 (Robust Speaker Selection for Tool Calls)**:
+    1.  Implemented a highly customized speaker selection function (`custom_speaker_selection_logic`) in `mdt_simulation_tool_CRIT.py`.
+    2.  This function specifically addresses the `GroupChat`'s internal quirk in handling tool responses by:
+        *   Ignoring the potentially misattributed `name` field on `tool` messages.
+        *   Explicitly searching the message history to reliably find the `tool_call_id` within the `tool_responses` and then tracing back to the original `assistant` agent that initiated the call.
+        *   Forcing the turn back to the tool-calling agent to process the tool's output and complete its analysis before advancing the round-robin.
+    3.  This ensures a smooth, multi-step turn for agents needing to use tools.
+
+*   **Solution 3 (Decoupled Output Extraction)**:
+    1.  Removed all hardcoded doctor names from `mdt_autogen_package/output_extractor.py`'s guidance prompt.
+    2.  Updated the prompt to refer to agents by their generic role names (e.g., "Radiologist agent", "Rheumatologist_Chair agent").
+    3.  This makes the output extraction logic robust and independent of specific persona names.
+
+*   **Outcome**: The MDT simulation now executes with a clear, coherent discussion flow. Specialist agents (including those using tools) reliably provide their CRIT analyses in the planned order, followed by a correct summarization from the dedicated `Rheumatologist_Chair`. The system is highly modular, robust, and correctly handles complex agent interactions.
+
+### Step 6: Architectural Overhaul for Dynamic "Simulate-and-Evaluate" Workflow (2025年12月2日 星期二)
+*   **Problem 1 (Evaluation Mismatch)**: The previous evaluation workflow was brittle. The AI agents answered a fixed set of 7 questions, while the Ground Truth (GT) in each patient's JSON file contained a variable, evolving set of questions. This fundamental mismatch led to inaccurate metrics and numerous `NA_GT` (Not Answerable from Ground Truth) errors.
+*   **Problem 2 (Cumbersome Workflow)**: The process involved multiple separate steps: (1) run all simulations, (2) run an extractor script to create a CSV, and (3) run an evaluation script against the CSV. This was inefficient and not easily adaptable.
+*   **Problem 3 (Poor Experiment Support)**: There was no easy way to toggle agent capabilities (like tool use) or to automatically name and compare outputs from different LLM configurations, making controlled experiments difficult.
+
+*   **Solution: A Unified, Dynamic, End-to-End System**: The entire architecture was refactored into a single, cohesive workflow orchestrated by `main_runner.py`.
+    1.  **Dynamic Question Injection**: The core simulation logic in `mdt_simulation_tool_CRIT.py` was modified to accept a dynamic list of questions for each run. The `main_runner.py` now reads the specific questions from each patient's `討論事項及結論` section and injects them into the simulation for that patient.
+    2.  **Structured JSON Output**: The `Rheumatologist_Chair`'s prompt was fundamentally changed. It is now instructed to provide its final answers in a **single, valid JSON object**, where the keys are the exact questions it was asked. This makes the model's output reliably parsable, eliminating a major source of errors.
+    3.  **Real-time Evaluation & Robust Parsing**: After each simulation, `main_runner.py` immediately:
+        *   Parses the returned JSON from the Chair agent.
+        *   Uses a **key normalization function** to robustly match the GT questions (e.g., `"Is it ILD?"`) with the model's generated keys (e.g., `"Is it ILD"`) by ignoring punctuation and whitespace differences.
+        *   Parses the model's natural language answers (including Chinese "是", "否", "有") into standardized boolean values.
+        *   Logs the detailed comparison (GT answer, raw model answer, parsed answer, result) to a run-specific CSV file (e.g., `evaluation_results/evaluation_log_gpt-oss_20b_tools_on.csv`).
+    4.  **Automated Multi-Run Reporting**: To facilitate easy comparison, the workflow now includes:
+        *   **Run-specific JSON reports**: After each full run, `main_runner.py` saves the calculated aggregate metrics into a uniquely named JSON file (e.g., `evaluation_results/report_gpt-oss_20b_tools_on.json`). The name is generated dynamically from the model and tool settings in `config.py`.
+        *   **Aggregated Excel Report**: The script then automatically scans the `evaluation_results/` directory for all `report_*.json` files, aggregates their data, and generates a comprehensive `evaluation_summary_report.xlsx`. This report features a side-by-side comparison of all models and includes a "P-Value_Comparison" sheet if exactly two models are found.
+    5.  **Configurable Experiments**: The `config.py` file was enhanced with an `ENABLE_TOOLS = True` flag, allowing tool usage to be easily switched on or off for controlled experiments.
+
+*   **Outcome**: The project has been transformed into a fully automated, end-to-end research platform. A user can now simply modify `config.py` to define an experiment (new model, tools on/off), execute `main_runner.py`, and receive a detailed CSV log, a JSON summary for that run, and an automatically updated Excel spreadsheet comparing all experiments conducted to date. This architecture is highly robust, efficient, and purpose-built for comparative analysis. The previous `evaluation.py`, `output_extractor.py`, `validate_gts.py` scripts and the `mdt_outputs/` directory have been made obsolete.

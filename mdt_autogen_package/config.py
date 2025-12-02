@@ -10,7 +10,7 @@ OLLAMA_MODEL_NAME = "gpt-oss:20b"
 OLLAMA_API_BASE = "http://" + pro6000 + "/v1"
 OLLAMA_API_KEY = "ollama"
 OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:137m-v1.5-fp16"
-EXTRACTOR_OLLAMA_MODEL_NAME = "qwen3:8b" # For the Langchain-based extractor
+EXTRACTOR_OLLAMA_MODEL_NAME = "gpt-oss:20b" # For the Langchain-based extractor
 
 # --- File and Directory Paths ---
 # PROJECT_ROOT is the directory containing 'mdt_autogen_package' and 'main_runner.py'

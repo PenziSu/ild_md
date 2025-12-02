@@ -42,8 +42,10 @@ mypy_extensions==1.1.0
 #numpy @ file:///C:/b/abs_c1ywpu18ar/croot/numpy_and_numpy_base_1708638681471/work/dist/numpy-1.26.4-cp310-cp310-win_amd64.whl#sha256=ebb5aa2b36d8afa5ec3231c19e5a1fc75b6d85e7db483f0fb9e77dad58469977
 ollama==0.4.8
 openai==1.82.0
+openpyxl
 orjson==3.10.18
 #packaging @ file:///C:/b/abs_3by6s2fa66/croot/packaging_1734472138782/work
+pandas
 propcache==0.3.1
 pydantic==2.11.5
 pydantic-settings==2.9.1

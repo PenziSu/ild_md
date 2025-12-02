@@ -2,15 +2,16 @@
 import os
 
 # --- LLM Configuration ---
-phison_ip = '192.168.1.100:11434'
-nstc_ip = '192.168.1.101:11434'
 pro6000 = '172.22.135.15:11434'
 
-OLLAMA_MODEL_NAME = "gpt-oss:20b"
+OLLAMA_MODEL_NAME = "qwen3:30b"
 OLLAMA_API_BASE = "http://" + pro6000 + "/v1"
 OLLAMA_API_KEY = "ollama"
 OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:137m-v1.5-fp16"
-EXTRACTOR_OLLAMA_MODEL_NAME = "gpt-oss:20b" # For the Langchain-based extractor
+EXTRACTOR_OLLAMA_MODEL_NAME = OLLAMA_MODEL_NAME # For the Langchain-based extractor
+
+# --- Simulation Configuration ---
+ENABLE_TOOLS = True # Master switch for enabling/disabling agent tools
 
 # --- File and Directory Paths ---
 # PROJECT_ROOT is the directory containing 'mdt_autogen_package' and 'main_runner.py'
@@ -22,8 +23,10 @@ KNOWLEDGE_BASE_DIR = os.path.join(PROJECT_ROOT, "mdt_autogen_package", "knowledg
 GUIDELINES_FILE = os.path.join(KNOWLEDGE_BASE_DIR, "guidelines.txt")
 SIMILAR_CASES_FILE = os.path.join(KNOWLEDGE_BASE_DIR, "similar_cases.txt")
 
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "mdt_outputs")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "mdt_outputs") # This one is now obsolete but left for reference
 OUTPUT_CSV_PREFIX = f"mdt_autogen_extracted_{OLLAMA_MODEL_NAME.replace(":","_")}" # Changed prefix to distinguish
+
+EVALUATION_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "evaluation_results")
 
 # --- RAG Configuration ---
 RAG_TOP_K = 3

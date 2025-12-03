@@ -4,14 +4,23 @@ import os
 # --- LLM Configuration ---
 pro6000 = '172.22.135.15:11434'
 
-OLLAMA_MODEL_NAME = "qwen3:30b"
+OLLAMA_MODEL_NAME = "gpt-oss:20b"
 OLLAMA_API_BASE = "http://" + pro6000 + "/v1"
 OLLAMA_API_KEY = "ollama"
 OLLAMA_EMBEDDING_MODEL_NAME = "nomic-embed-text:137m-v1.5-fp16"
 EXTRACTOR_OLLAMA_MODEL_NAME = OLLAMA_MODEL_NAME # For the Langchain-based extractor
 
 # --- Simulation Configuration ---
-ENABLE_TOOLS = True # Master switch for enabling/disabling agent tools
+ENABLE_TOOLS = False # Master switch for enabling/disabling agent tools
+DEFAULT_EVALUATION_QUESTIONS = [
+    "是否為ILD?",
+    "是否為UIP?",
+    "是否還有NSIP pattern?",
+    "是否還有免風疾病活動性(activity) 病變?",
+    "是否為PF-ILD?",
+    "是否調整免疫治療藥物?",
+    "是否建議使用抗肺纖維化藥物?"
+]
 
 # --- File and Directory Paths ---
 # PROJECT_ROOT is the directory containing 'mdt_autogen_package' and 'main_runner.py'
